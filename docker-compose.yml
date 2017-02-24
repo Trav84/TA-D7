@@ -1,0 +1,77 @@
+# Replace images with appropriate values for web/php
+# ie the $DOCKER_REPOSITORY/$PROJECT_SHORTNAME values should be replaced inline here rather then env vars so local devs don't need to set them.
+# Also, change the directory that the 'theme' container is mounting to reflect the actual theme.
+# it has been set to $THEME_PATH here
+
+version: '2'
+services:
+  # PHP 5.6
+  web:
+    image: us.gcr.io/favish-general/aact-web
+    ports:
+      - 80:80
+    volumes:
+      - ./project:/var/www
+      - ./.docker/web:/etc/nginx/conf.d
+    links:
+      - php
+
+  # PHP 5.6
+  php:
+    build: ./.docker/php
+    links:
+      - db
+    volumes:
+      - ./project:/var/www
+      - ./.docker/php/100-custom.ini:/usr/local/etc/php/conf.d/100-custom.ini
+    expose:
+      - 9000
+    environment:
+      - MYSQL_DB=docker
+      - MYSQL_USER=docker
+      - MYSQL_PASS=docker
+      - MYSQL_HOST=db
+
+  # PHP 5.6
+  xdebug:
+    build: .docker/xdebug
+    volumes_from:
+      - php
+    links:
+      - db
+    environment:
+      - MYSQL_DB=docker
+      - MYSQL_USER=docker
+      - MYSQL_PASS=docker
+      - MYSQL_HOST=db
+      # LOCAL_HOST_IP is only required if running through a VM like dinghy
+      # If you ARENT using dinghy/toolbox, remove the line using this value in zz-xdebug.ini for this image
+      - LOCAL_HOST_IP=$LOCAL_HOST_IP
+
+  db:
+    image: sameersbn/mysql
+    volumes:
+      - ./:/var/www/
+      - /var/lib/mysql
+    environment:
+      - DB_NAME=docker
+      - DB_USER=docker
+      - DB_PASS=docker
+
+  cli:
+    image: favish/cli
+    links:
+      - db
+    environment:
+      - TERM=xterm
+      - LANG=en_US.UTF-8
+      - LANGUAGE=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    ports:
+      # Webpack-dev-server/gulp
+      - 8080:8080
+    volumes:
+      - ./project:/var/www
+      # Allows caching of composer for faster installs on a per project basis
+      - /root/.composer
+      - ${HOME}/.ssh:/.ssh
